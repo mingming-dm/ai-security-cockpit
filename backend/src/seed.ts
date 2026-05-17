@@ -1,12 +1,13 @@
 /**
- * 数据库种子脚本 — 生成演示数据
- * 运行: npm run seed
+ * 数据库种子 — 生成演示数据
+ * 可作为脚本独立运行: npx tsx src/seed.ts
+ * 也可在生产启动时调用 seedDemoData(db)
  */
+import Database from 'better-sqlite3';
 import { getDb, closeDb } from './database';
 
-function seed() {
+export function seedDemoData(db: Database.Database) {
   console.log('🌱 开始生成演示数据...');
-  const db = getDb();
 
   // 生成近7天的统计数据
   const now = new Date();
@@ -69,10 +70,14 @@ function seed() {
   console.log('🎉 演示数据生成完成！');
 }
 
-try {
-  seed();
-} catch (err) {
-  console.error('Seed error:', err);
-} finally {
-  closeDb();
+// 作为独立脚本运行时
+if (require.main === module) {
+  try {
+    const db = getDb();
+    seedDemoData(db);
+  } catch (err) {
+    console.error('Seed error:', err);
+  } finally {
+    closeDb();
+  }
 }
