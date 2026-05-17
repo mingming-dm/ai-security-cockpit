@@ -42,6 +42,36 @@ const FRAUD_PATTERNS = [
   { pattern: /AI\s*(?:换脸|合成|生成).*(?:视频|语音|照片).*(?:诈骗|骗取)/gi, label: 'AI诈骗关联', severity: 'critical' },
 ];
 
+// 不良/违规言论模式
+const OFFENSIVE_PATTERNS = [
+  // 人身攻击与辱骂
+  { pattern: /(?:傻[逼屄比叉]|[Ss][Bb]|煞笔|啥比|沙比|傻叉|傻X)/g, label: '辱骂性词汇', severity: 'high' },
+  { pattern: /(?:尼玛|你[妈馬]|尼[码馬]|nmsl|cnm|草泥马|艹你|操你|草你|日你|干你[娘妈])/gi, label: '人身攻击/辱骂', severity: 'high' },
+  { pattern: /(?:脑残|弱智|智障|白痴|废物|垃圾[东西玩意人货])/g, label: '侮辱性词汇', severity: 'high' },
+  { pattern: /(?:滚[蛋出开吧]|给老子[滚爬]|去[死屎]吧|去你[妈嗎的]|滚犊子)/g, label: '攻击性驱赶语言', severity: 'high' },
+  // 粗鄙/低俗词汇
+  { pattern: /(?:[卧我]槽|我[靠操艹]|[卧我]去|尼玛|特么|他妈[的滴]|你丫|[卧我]日|kao|fuck|shit|damn|bitch)/gi, label: '粗鄙/低俗词汇', severity: 'medium' },
+  { pattern: /(?:[鸡激][巴八]|[牛逼B]|[屌吊炸]|碉堡|屁[事股话])/g, label: '低俗口语', severity: 'medium' },
+  // 歧视与仇恨言论
+  { pattern: /(?:歧视|看不起|瞧不起).*(?:农村|外地|穷人|农民工|乡下)/g, label: '地域/阶层歧视', severity: 'critical' },
+  { pattern: /(?:地域黑|河南人偷|东北人.*(?:粗鲁|野蛮)|上海人.*(?:小气|排外))/g, label: '地域攻击', severity: 'critical' },
+  { pattern: /(?:女生.*(?:就该|活该|没用)|男生.*(?:就该|活该|没用)|娘炮|女拳|男拳)/g, label: '性别歧视/攻击', severity: 'critical' },
+  { pattern: /(?:[胖肥].*(?:猪|死|丑)|长[得]?.*丑.*[死爆要命])/g, label: '外貌羞辱', severity: 'high' },
+  // 威胁与恐吓
+  { pattern: /(?:信不信.*(?:打[死你]|弄[死你]|[砍剁][了你])|你.*等着.*[瞧看]|放学.*别[走跑]|我[要就].*(?:弄死|打死|杀了|灭了)你)/g, label: '人身威胁/恐吓', severity: 'critical' },
+  { pattern: /(?:曝光你|人肉你|查你.*[地址IP信息]|你[家爸妈父母].*地址)/g, label: '人肉搜索威胁', severity: 'critical' },
+  // 骚扰与霸凌
+  { pattern: /(?:约[吗不炮]|来[一几]发|上床|开房|做[爱我]|陪[我睡]|约不约|yp|ons)/gi, label: '骚扰性内容', severity: 'high' },
+  { pattern: /(?:孤立你|别和.*[玩交]|不要.*理|大家.*孤立|全班.*针对)/g, label: '校园霸凌倾向', severity: 'critical' },
+  // 自残与暴力
+  { pattern: /(?:自杀|自残|割腕|跳楼|不想活|[活過]不下去了|我想[死]|活[着著]没意思)/g, label: '自残/自杀倾向', severity: 'critical' },
+  { pattern: /(?:砍死|捅死|枪杀|炸[了掉]|放火|毒死|弄死|灭门)/g, label: '暴力倾向', severity: 'critical' },
+  // 违法内容
+  { pattern: /(?:代考|替考|买[答案題]|作弊[器具]|四六级[答案]|期末考试[答案])/g, label: '学术作弊', severity: 'high' },
+  { pattern: /(?:[卖出售].*(?:毒品|冰毒|大麻|[摇搖頭]头丸|K粉)|吸毒|溜冰)/g, label: '毒品相关', severity: 'critical' },
+  { pattern: /(?:网赌|赌博|下注|赌球|澳门[在線线]上|六合彩)/g, label: '赌博相关内容', severity: 'high' },
+];
+
 interface ScanResult {
   type: string;
   label: string;
@@ -99,6 +129,19 @@ function analyzeFraud(text: string): ScanResult[] {
   }).filter(r => r.matchCount > 0);
 }
 
+function analyzeOffensive(text: string): ScanResult[] {
+  return OFFENSIVE_PATTERNS.map(({ pattern, label, severity }) => {
+    const matches = text.match(pattern) || [];
+    return {
+      type: 'offensive',
+      label,
+      severity,
+      matchCount: matches.length,
+      matched: [...new Set(matches)].slice(0, 3),
+    };
+  }).filter(r => r.matchCount > 0);
+}
+
 function calculateRiskScore(findings: ScanResult[]): number {
   const severityWeights: Record<string, number> = {
     critical: 25,
@@ -145,6 +188,17 @@ function generateSuggestions(findings: ScanResult[]): string[] {
     suggestions.push('🚨 此内容具有诈骗特征，建议立即举报并通知相关人员');
     suggestions.push('📞 如已受骗，请立即联系校园保卫处或拨打 110');
   }
+  if (types.has('offensive')) {
+    const hasCritical = findings.some(f => f.type === 'offensive' && f.severity === 'critical');
+    suggestions.push('⚠️ 检测到不当言论，请立即停止此类发言');
+    if (hasCritical) {
+      suggestions.push('⛔ 内容涉及严重违规（威胁/歧视/霸凌），建议上报校园管理部门处理');
+      suggestions.push('📞 如涉及人身安全威胁，请立即联系校园保卫处');
+    } else {
+      suggestions.push('💡 请注意网络文明用语，尊重他人，营造良好的交流氛围');
+    }
+    suggestions.push('📋 根据校园网络使用规范，此类言论可能导致纪律处分');
+  }
   if (suggestions.length === 0) {
     suggestions.push('✨ 当前内容风险可控，继续保持良好的安全习惯');
   }
@@ -154,7 +208,10 @@ function generateSuggestions(findings: ScanResult[]): string[] {
 
 // 主检测函数
 export function detectContentRisk(text: string): AnalysisResult {
-  const findings = analyzePatterns(text, SENSITIVE_PATTERNS);
+  const findings = [
+    ...analyzePatterns(text, SENSITIVE_PATTERNS),
+    ...analyzeOffensive(text),
+  ];
   const riskScore = calculateRiskScore(findings);
   const riskLevel = getRiskLevel(riskScore);
 
