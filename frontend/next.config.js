@@ -1,9 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
-  // 静态导出时，API 请求走相对路径（与后端同域部署）
-  // 本地开发时通过 npm run dev 的 rewrites 代理到 3001
-  trailingSlash: true,
+  // Vercel 部署：API routes 直接处理 /api/* 请求
+  // 本地开发时 npm run dev 即可，无需额外后端
 };
 
 module.exports = nextConfig;
